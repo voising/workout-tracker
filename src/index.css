@@ -1,0 +1,152 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 351 96% 39%;  /* #BF092F */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 351 96% 39%;
+    --radius: 0.75rem;
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+    --gradient-start: 351 100% 45%;
+    --gradient-end: 351 96% 35%;
+  }
+
+  .dark {
+    --background: 20 14% 11%;  /* Warm gray background */
+    --foreground: 30 10% 92%;  /* Warm off-white text */
+    --card: 20 14% 14%;  /* Slightly lighter warm gray for cards */
+    --card-foreground: 30 10% 92%;
+    --popover: 20 14% 14%;
+    --popover-foreground: 30 10% 92%;
+    --primary: 351 96% 50%;  /* Brighter primary for dark mode */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 20 12% 18%;  /* Warm gray secondary */
+    --secondary-foreground: 30 10% 92%;
+    --muted: 20 12% 18%;
+    --muted-foreground: 30 8% 65%;  /* Warm muted text */
+    --accent: 20 12% 18%;
+    --accent-foreground: 30 10% 92%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 20 12% 22%;  /* Warm gray borders */
+    --input: 20 12% 22%;
+    --ring: 351 96% 50%;
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+    --gradient-start: 351 100% 55%;
+    --gradient-end: 351 96% 40%;
+  }
+
+  /* Dark mode gradient background */
+  .dark body {
+    background: linear-gradient(135deg, hsl(20, 20%, 8%) 0%, hsl(351, 50%, 8%) 20%, hsl(20, 15%, 10%) 40%, hsl(351, 40%, 12%) 60%, hsl(20, 18%, 10%) 80%, hsl(351, 35%, 10%) 100%);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-muted/30;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-muted-foreground/30 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/50;
+  }
+}
+
+@layer utilities {
+  .gradient-primary {
+    background: linear-gradient(135deg, hsl(var(--gradient-start)), hsl(var(--gradient-end)));
+  }
+
+  .gradient-text {
+    background: linear-gradient(135deg, hsl(var(--gradient-start)), hsl(var(--gradient-end)));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .dark .gradient-text {
+    background: none;
+    -webkit-text-fill-color: hsl(var(--foreground));
+    color: hsl(var(--foreground));
+  }
+
+  .glass-effect {
+    background: hsla(var(--card), 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  .shadow-glow {
+    box-shadow: 0 0 20px hsla(var(--primary), 0.3);
+  }
+
+  .animate-shimmer {
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      hsla(var(--primary), 0.1) 50%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 2s infinite;
+  }
+
+  @keyframes shimmer {
+    0% {
+      background-position: -200% 0;
+    }
+    100% {
+      background-position: 200% 0;
+    }
+  }
+
+  .animate-pulse-glow {
+    animation: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% {
+      box-shadow: 0 0 0 0 hsla(var(--primary), 0.7);
+    }
+    50% {
+      box-shadow: 0 0 0 10px hsla(var(--primary), 0);
+    }
+  }
+}
