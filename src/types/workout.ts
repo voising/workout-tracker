@@ -1,6 +1,7 @@
 export interface WorkoutSet {
   reps: number;
   weight?: number; // optional weight in kg/lbs
+  completed?: boolean; // track if set is marked as done
 }
 
 export interface Exercise {

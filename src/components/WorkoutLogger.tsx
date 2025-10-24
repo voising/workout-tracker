@@ -13,9 +13,10 @@ interface WorkoutLoggerProps {
   existingSession?: WorkoutSession | null;
   previousSession?: WorkoutSession | null;
   onSave: () => void;
+  kanbanMode?: boolean;
 }
 
-export function WorkoutLogger({ selectedDate, existingSession, previousSession, onSave }: WorkoutLoggerProps) {
+export function WorkoutLogger({ selectedDate, existingSession, previousSession, onSave, kanbanMode = false }: WorkoutLoggerProps) {
   const [exercises, setExercises] = useState<Exercise[]>(
     existingSession?.exercises || []
   );
@@ -130,6 +131,20 @@ export function WorkoutLogger({ selectedDate, existingSession, previousSession, 
     setExercises(updated);
   };
 
+  const toggleSetComplete = (exerciseIndex: number, setIndex: number) => {
+    const updated = [...exercises];
+    updated[exerciseIndex].sets[setIndex].completed = !updated[exerciseIndex].sets[setIndex].completed;
+    setExercises(updated);
+  };
+
+  const markSetCompleteOnInteraction = (exerciseIndex: number, setIndex: number) => {
+    const updated = [...exercises];
+    if (!updated[exerciseIndex].sets[setIndex].completed) {
+      updated[exerciseIndex].sets[setIndex].completed = true;
+      setExercises(updated);
+    }
+  };
+
   const saveWorkout = () => {
     const session: WorkoutSession = {
       id: existingSession?.id || `session-${selectedDate}-${Date.now()}`,
@@ -142,7 +157,7 @@ export function WorkoutLogger({ selectedDate, existingSession, previousSession, 
   };
 
   return (
-    <div className="space-y-6">
+    <div className={kanbanMode ? "-mx-4 lg:-mx-8" : "space-y-6"}>
       <Card className="shadow-xl hover:shadow-2xl transition-shadow duration-300">
         <CardHeader className="pb-4">
           <CardTitle className="text-2xl gradient-text">Log Workout - {selectedDate}</CardTitle>
@@ -216,315 +231,684 @@ export function WorkoutLogger({ selectedDate, existingSession, previousSession, 
             </motion.div>
           )}
 
-          <AnimatePresence mode="popLayout">
-            {exercises.map((exercise, exerciseIndex) => (
-              <motion.div
-                key={exerciseIndex}
-                initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, x: -100, scale: 0.9 }}
-                transition={{ type: "spring", stiffness: 300, damping: 25 }}
-                className="rounded-2xl p-5 space-y-4 bg-gradient-to-br from-accent/30 to-accent/50 shadow-lg hover:shadow-xl transition-shadow duration-300"
-              >
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <h3 className="font-bold text-xl text-foreground">{exercise.name}</h3>
-                    <div className="flex gap-2">
-                      <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => incrementAllReps(exerciseIndex, 2)}
-                          className="h-7 px-3 text-xs font-bold text-primary hover:text-primary hover:bg-primary/10 rounded-lg transition-all duration-300"
-                          title="Add 2 reps to all sets"
-                        >
-                          +2 all
-                        </Button>
-                      </motion.div>
-                      <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => incrementAllReps(exerciseIndex, 5)}
-                          className="h-7 px-3 text-xs font-bold text-primary hover:text-primary hover:bg-primary/10 rounded-lg transition-all duration-300"
-                          title="Add 5 reps to all sets"
-                        >
-                          +5 all
-                        </Button>
-                      </motion.div>
-                    </div>
-                  </div>
-                  <motion.div whileHover={{ scale: 1.1, rotate: 10 }} whileTap={{ scale: 0.9 }}>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => removeExercise(exerciseIndex)}
-                      className="hover:bg-destructive/10 rounded-xl transition-all duration-300"
-                    >
-                      <Trash2 className="h-5 w-5 text-destructive" />
-                    </Button>
-                  </motion.div>
-                </div>
-
-                <div className="space-y-2 sm:space-y-3">
-                  {exercise.sets.map((set, setIndex) => {
-                    // Get previous session's data for this exercise and set
-                    const prevExercise = previousSession?.exercises.find(e => e.name === exercise.name);
-                    const prevSet = prevExercise?.sets[setIndex];
-
-                    return (
+          {kanbanMode ? (
+            /* Kanban Layout - Full screen width horizontal scroll */
+            <div className="overflow-x-auto -mx-6 px-6">
+              <div className="flex gap-4 pb-4 min-w-max">
+                <AnimatePresence mode="popLayout">
+                  {exercises.map((exercise, exerciseIndex) => (
                     <motion.div
-                      key={setIndex}
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ delay: setIndex * 0.05 }}
-                      className="bg-card/50 p-3 sm:p-3 rounded-xl shadow-md space-y-2 sm:space-y-0"
+                      key={exerciseIndex}
+                      initial={{ opacity: 0, x: -20, scale: 0.95 }}
+                      animate={{ opacity: 1, x: 0, scale: 1 }}
+                      exit={{ opacity: 0, x: -100, scale: 0.9 }}
+                      transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                      className="flex-shrink-0 w-auto rounded-2xl p-5 space-y-4 bg-gradient-to-br from-accent/30 to-accent/50 shadow-lg hover:shadow-xl transition-shadow duration-300"
                     >
-                      {/* Mobile Layout - Stacked */}
-                      <div className="flex sm:hidden flex-col gap-3">
-                        {/* Set number and Use Prev button row */}
-                        <div className="flex items-center justify-between">
-                          <Label className="text-primary font-bold text-base">
-                            Set {setIndex + 1}
-                          </Label>
-                          <div className="flex items-center gap-2">
-                            {prevSet && (!set.reps || !set.weight) && (
-                              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => {
-                                    if (prevSet.reps) updateSet(exerciseIndex, setIndex, 'reps', String(prevSet.reps));
-                                    if (prevSet.weight) updateSet(exerciseIndex, setIndex, 'weight', String(prevSet.weight));
-                                  }}
-                                  className="h-8 px-3 text-xs font-bold hover:bg-primary/10 rounded-lg text-primary"
-                                  title="Use previous values"
-                                >
-                                  Use Prev
-                                </Button>
-                              </motion.div>
-                            )}
-                            {exercise.sets.length > 1 && (
-                              <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => removeSet(exerciseIndex, setIndex)}
-                                  className="h-8 w-8 hover:bg-destructive/10 rounded-lg"
-                                >
-                                  <Trash2 className="h-4 w-4 text-destructive" />
-                                </Button>
-                              </motion.div>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Reps input with increment buttons */}
-                        <div className="flex items-center gap-2">
-                          <Label className="text-sm font-semibold text-muted-foreground w-16">Reps</Label>
-                          <Input
-                            type="number"
-                            placeholder={prevSet?.reps ? `${prevSet.reps}` : "0"}
-                            value={set.reps || ''}
-                            onChange={(e) =>
-                              updateSet(exerciseIndex, setIndex, 'reps', e.target.value)
-                            }
-                            className="flex-1 h-12 border-2 font-bold text-center text-lg placeholder:text-muted-foreground/50"
-                          />
-                          <div className="flex gap-1.5">
-                            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                              <Button
-                                onClick={() => incrementReps(exerciseIndex, setIndex, 2)}
-                                className="h-10 w-10 p-0 text-sm font-bold gradient-primary shadow-md"
-                                title="Add 2 reps"
-                              >
-                                +2
-                              </Button>
-                            </motion.div>
-                            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                              <Button
-                                onClick={() => incrementReps(exerciseIndex, setIndex, 5)}
-                                className="h-10 w-10 p-0 text-sm font-bold gradient-primary shadow-md"
-                                title="Add 5 reps"
-                              >
-                                +5
-                              </Button>
-                            </motion.div>
-                          </div>
-                        </div>
-
-                        {/* Weight input with increment buttons */}
-                        <div className="flex items-center gap-2">
-                          <Label className="text-sm font-semibold text-muted-foreground w-16">Weight</Label>
-                          <Input
-                            type="number"
-                            step="0.5"
-                            placeholder={prevSet?.weight ? `${prevSet.weight}` : "0"}
-                            value={set.weight || ''}
-                            onChange={(e) =>
-                              updateSet(exerciseIndex, setIndex, 'weight', e.target.value)
-                            }
-                            className="flex-1 h-12 border-2 font-bold text-center text-lg placeholder:text-muted-foreground/50"
-                          />
-                          <div className="flex gap-1.5">
-                            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                              <Button
-                                onClick={() => {
-                                  const currentWeight = set.weight || 0;
-                                  updateSet(exerciseIndex, setIndex, 'weight', String(currentWeight + 2));
-                                }}
-                                className="h-10 w-10 p-0 text-sm font-bold gradient-primary shadow-md"
-                                title="Add 2kg"
-                              >
-                                +2
-                              </Button>
-                            </motion.div>
-                            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                              <Button
-                                onClick={() => {
-                                  const currentWeight = set.weight || 0;
-                                  updateSet(exerciseIndex, setIndex, 'weight', String(currentWeight + 5));
-                                }}
-                                className="h-10 w-10 p-0 text-sm font-bold gradient-primary shadow-md"
-                                title="Add 5kg"
-                              >
-                                +5
-                              </Button>
-                            </motion.div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Desktop Layout - Horizontal */}
-                      <div className="hidden sm:flex gap-2 items-center">
-                        <div className="flex items-center gap-1">
-                          <Label className="w-12 text-primary font-bold text-sm shrink-0">
-                            Set {setIndex + 1}
-                          </Label>
-                          {prevSet && (!set.reps || !set.weight) && (
-                            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                      {/* Kanban card content - same structure as normal but in fixed width cards */}
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <h3 className="font-bold text-xl text-foreground">{exercise.name}</h3>
+                          <div className="flex gap-2">
+                            <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => {
-                                  if (prevSet.reps) updateSet(exerciseIndex, setIndex, 'reps', String(prevSet.reps));
-                                  if (prevSet.weight) updateSet(exerciseIndex, setIndex, 'weight', String(prevSet.weight));
-                                }}
-                                className="h-5 px-1.5 text-[10px] font-bold hover:bg-primary/10 rounded shrink-0 text-primary"
-                                title="Use previous values"
+                                onClick={() => incrementAllReps(exerciseIndex, 2)}
+                                className="h-7 px-3 text-xs font-bold text-primary hover:text-primary hover:bg-primary/10 rounded-lg transition-all duration-300"
+                                title="Add 2 reps to all sets"
                               >
-                                Use Prev
+                                +2 all
+                              </Button>
+                            </motion.div>
+                            <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => incrementAllReps(exerciseIndex, 5)}
+                                className="h-7 px-3 text-xs font-bold text-primary hover:text-primary hover:bg-primary/10 rounded-lg transition-all duration-300"
+                                title="Add 5 reps to all sets"
+                              >
+                                +5 all
+                              </Button>
+                            </motion.div>
+                          </div>
+                        </div>
+                        <motion.div whileHover={{ scale: 1.1, rotate: 10 }} whileTap={{ scale: 0.9 }}>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeExercise(exerciseIndex)}
+                            className="hover:bg-destructive/10 rounded-xl transition-all duration-300"
+                          >
+                            <Trash2 className="h-5 w-5 text-destructive" />
+                          </Button>
+                        </motion.div>
+                      </div>
+
+                      <div className="space-y-2 sm:space-y-3">
+                        {exercise.sets.map((set, setIndex) => {
+                          // Get previous session's data for this exercise and set
+                          const prevExercise = previousSession?.exercises.find(e => e.name === exercise.name);
+                          const prevSet = prevExercise?.sets[setIndex];
+
+                          return (
+                          <motion.div
+                            key={setIndex}
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{
+                              opacity: set.completed ? 1 : 0.3,
+                              scale: set.completed ? [1, 1.05, 1] : 1
+                            }}
+                            transition={{
+                              opacity: { duration: 0.3 },
+                              scale: {
+                                duration: 0.25,
+                                times: [0, 0.5, 1]
+                              }
+                            }}
+                            className="bg-card/50 p-3 sm:p-3 rounded-xl shadow-md space-y-2 sm:space-y-0"
+                          >
+                            {/* Mobile Layout - Stacked */}
+                            <div className="flex sm:hidden flex-col gap-3">
+                              {/* Set number and Use Prev button row */}
+                              <div className="flex items-center justify-between">
+                                <motion.div
+                                  whileTap={{ scale: 0.95 }}
+                                  onClick={() => toggleSetComplete(exerciseIndex, setIndex)}
+                                  className="cursor-pointer"
+                                >
+                                  <Label className="text-primary font-bold text-base cursor-pointer">
+                                    Set {setIndex + 1}
+                                  </Label>
+                                </motion.div>
+                                <div className="flex items-center gap-2">
+                                  {prevSet && (!set.reps || !set.weight) && (
+                                    <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => {
+                                          if (prevSet.reps) updateSet(exerciseIndex, setIndex, 'reps', String(prevSet.reps));
+                                          if (prevSet.weight) updateSet(exerciseIndex, setIndex, 'weight', String(prevSet.weight));
+                                        }}
+                                        className="h-8 px-3 text-xs font-bold hover:bg-primary/10 rounded-lg text-primary"
+                                        title="Use previous values"
+                                      >
+                                        Use Prev
+                                      </Button>
+                                    </motion.div>
+                                  )}
+                                  {exercise.sets.length > 1 && (
+                                    <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => removeSet(exerciseIndex, setIndex)}
+                                        className="h-8 w-8 hover:bg-destructive/10 rounded-lg"
+                                      >
+                                        <Trash2 className="h-4 w-4 text-destructive" />
+                                      </Button>
+                                    </motion.div>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Reps input with increment buttons */}
+                              <div className="flex items-center gap-2">
+                                <Label className="text-sm font-semibold text-muted-foreground w-16">Reps</Label>
+                                <Input
+                                  type="number"
+                                  placeholder={prevSet?.reps ? `${prevSet.reps}` : "0"}
+                                  value={set.reps || ''}
+                                  onFocus={() => markSetCompleteOnInteraction(exerciseIndex, setIndex)}
+                                  onChange={(e) =>
+                                    updateSet(exerciseIndex, setIndex, 'reps', e.target.value)
+                                  }
+                                  className="flex-1 h-12 border-2 font-bold text-center text-lg placeholder:text-muted-foreground/50"
+                                />
+                                <div className="flex gap-1.5">
+                                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                                    <Button
+                                      onClick={() => {
+                                        markSetCompleteOnInteraction(exerciseIndex, setIndex);
+                                        incrementReps(exerciseIndex, setIndex, 2);
+                                      }}
+                                      className="h-10 w-10 p-0 text-sm font-bold gradient-primary shadow-md"
+                                      title="Add 2 reps"
+                                    >
+                                      +2
+                                    </Button>
+                                  </motion.div>
+                                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                                    <Button
+                                      onClick={() => {
+                                        markSetCompleteOnInteraction(exerciseIndex, setIndex);
+                                        incrementReps(exerciseIndex, setIndex, 5);
+                                      }}
+                                      className="h-10 w-10 p-0 text-sm font-bold gradient-primary shadow-md"
+                                      title="Add 5 reps"
+                                    >
+                                      +5
+                                    </Button>
+                                  </motion.div>
+                                </div>
+                              </div>
+
+                              {/* Weight input with increment buttons */}
+                              <div className="flex items-center gap-2">
+                                <Label className="text-sm font-semibold text-muted-foreground w-16">Weight</Label>
+                                <Input
+                                  type="number"
+                                  step="0.5"
+                                  placeholder={prevSet?.weight ? `${prevSet.weight}` : "0"}
+                                  value={set.weight || ''}
+                                  onFocus={() => markSetCompleteOnInteraction(exerciseIndex, setIndex)}
+                                  onChange={(e) =>
+                                    updateSet(exerciseIndex, setIndex, 'weight', e.target.value)
+                                  }
+                                  className="flex-1 h-12 border-2 font-bold text-center text-lg placeholder:text-muted-foreground/50"
+                                />
+                                <div className="flex gap-1.5">
+                                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                                    <Button
+                                      onClick={() => {
+                                        markSetCompleteOnInteraction(exerciseIndex, setIndex);
+                                        const currentWeight = set.weight || 0;
+                                        updateSet(exerciseIndex, setIndex, 'weight', String(currentWeight + 2));
+                                      }}
+                                      className="h-10 w-10 p-0 text-sm font-bold gradient-primary shadow-md"
+                                      title="Add 2kg"
+                                    >
+                                      +2
+                                    </Button>
+                                  </motion.div>
+                                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                                    <Button
+                                      onClick={() => {
+                                        markSetCompleteOnInteraction(exerciseIndex, setIndex);
+                                        const currentWeight = set.weight || 0;
+                                        updateSet(exerciseIndex, setIndex, 'weight', String(currentWeight + 5));
+                                      }}
+                                      className="h-10 w-10 p-0 text-sm font-bold gradient-primary shadow-md"
+                                      title="Add 5kg"
+                                    >
+                                      +5
+                                    </Button>
+                                  </motion.div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Desktop Layout - Horizontal */}
+                            <div className="hidden sm:flex gap-2 items-center">
+                              <div className="flex items-center gap-1">
+                                <motion.div
+                                  whileTap={{ scale: 0.95 }}
+                                  onClick={() => toggleSetComplete(exerciseIndex, setIndex)}
+                                  className="cursor-pointer"
+                                >
+                                  <Label className="w-12 text-primary font-bold text-sm shrink-0 cursor-pointer">
+                                    Set {setIndex + 1}
+                                  </Label>
+                                </motion.div>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <Input
+                                  type="number"
+                                  placeholder={prevSet?.reps ? `${prevSet.reps}` : "Reps"}
+                                  value={set.reps || ''}
+                                  onFocus={() => markSetCompleteOnInteraction(exerciseIndex, setIndex)}
+                                  onChange={(e) =>
+                                    updateSet(exerciseIndex, setIndex, 'reps', e.target.value)
+                                  }
+                                  className="w-20 h-10 border-2 font-bold text-center text-base placeholder:text-muted-foreground/50"
+                                />
+                                <div className="flex gap-1">
+                                  <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                                    <Button
+                                      size="sm"
+                                      onClick={() => {
+                                        markSetCompleteOnInteraction(exerciseIndex, setIndex);
+                                        incrementReps(exerciseIndex, setIndex, 2);
+                                      }}
+                                      className="h-8 w-8 p-0 text-xs font-bold gradient-primary shadow-sm"
+                                      title="Add 2 reps"
+                                    >
+                                      +2
+                                    </Button>
+                                  </motion.div>
+                                  <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                                    <Button
+                                      size="sm"
+                                      onClick={() => {
+                                        markSetCompleteOnInteraction(exerciseIndex, setIndex);
+                                        incrementReps(exerciseIndex, setIndex, 5);
+                                      }}
+                                      className="h-8 w-8 p-0 text-xs font-bold gradient-primary shadow-sm"
+                                      title="Add 5 reps"
+                                    >
+                                      +5
+                                    </Button>
+                                  </motion.div>
+                                </div>
+                              </div>
+                              <span className="text-muted-foreground text-xs font-medium shrink-0">reps</span>
+                              <div className="flex items-center gap-1">
+                                <Input
+                                  type="number"
+                                  step="0.5"
+                                  placeholder={prevSet?.weight ? `${prevSet.weight}` : "Weight"}
+                                  value={set.weight || ''}
+                                  onFocus={() => markSetCompleteOnInteraction(exerciseIndex, setIndex)}
+                                  onChange={(e) =>
+                                    updateSet(exerciseIndex, setIndex, 'weight', e.target.value)
+                                  }
+                                  className="w-20 h-10 border-2 font-bold text-center text-base placeholder:text-muted-foreground/50"
+                                />
+                                <div className="flex gap-1">
+                                  <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                                    <Button
+                                      size="sm"
+                                      onClick={() => {
+                                        markSetCompleteOnInteraction(exerciseIndex, setIndex);
+                                        const currentWeight = set.weight || 0;
+                                        updateSet(exerciseIndex, setIndex, 'weight', String(currentWeight + 2));
+                                      }}
+                                      className="h-8 w-8 p-0 text-xs font-bold gradient-primary shadow-sm"
+                                      title="Add 2kg"
+                                    >
+                                      +2
+                                    </Button>
+                                  </motion.div>
+                                  <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                                    <Button
+                                      size="sm"
+                                      onClick={() => {
+                                        markSetCompleteOnInteraction(exerciseIndex, setIndex);
+                                        const currentWeight = set.weight || 0;
+                                        updateSet(exerciseIndex, setIndex, 'weight', String(currentWeight + 5));
+                                      }}
+                                      className="h-8 w-8 p-0 text-xs font-bold gradient-primary shadow-sm"
+                                      title="Add 5kg"
+                                    >
+                                      +5
+                                    </Button>
+                                  </motion.div>
+                                </div>
+                              </div>
+                              <span className="text-muted-foreground text-xs font-medium shrink-0">kg</span>
+                              {exercise.sets.length > 1 && (
+                                <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => removeSet(exerciseIndex, setIndex)}
+                                    className="shrink-0 h-9 w-9 hover:bg-destructive/10 rounded-lg"
+                                  >
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                </motion.div>
+                              )}
+                            </div>
+                          </motion.div>
+                        );
+                        })}
+                      </div>
+
+                      <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => addSet(exerciseIndex)}
+                          className="w-full border-2 border-dashed border-primary/30 hover:border-primary/50 hover:bg-primary/5 transition-all duration-300 h-11 font-semibold"
+                        >
+                          <Plus className="h-5 w-5 mr-2" />
+                          Add Set
+                        </Button>
+                      </motion.div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
+            </div>
+          ) : (
+            /* Normal Column Layout */
+            <AnimatePresence mode="popLayout">
+              {exercises.map((exercise, exerciseIndex) => (
+                <motion.div
+                  key={exerciseIndex}
+                  initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -20, scale: 0.9 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                  className="rounded-2xl p-5 space-y-4 bg-gradient-to-br from-accent/30 to-accent/50 shadow-lg hover:shadow-xl transition-shadow duration-300"
+                >
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <h3 className="font-bold text-xl text-foreground">{exercise.name}</h3>
+                      <div className="flex gap-2">
+                        <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => incrementAllReps(exerciseIndex, 2)}
+                            className="h-7 px-3 text-xs font-bold text-primary hover:text-primary hover:bg-primary/10 rounded-lg transition-all duration-300"
+                            title="Add 2 reps to all sets"
+                          >
+                            +2 all
+                          </Button>
+                        </motion.div>
+                        <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => incrementAllReps(exerciseIndex, 5)}
+                            className="h-7 px-3 text-xs font-bold text-primary hover:text-primary hover:bg-primary/10 rounded-lg transition-all duration-300"
+                            title="Add 5 reps to all sets"
+                          >
+                            +5 all
+                          </Button>
+                        </motion.div>
+                      </div>
+                    </div>
+                    <motion.div whileHover={{ scale: 1.1, rotate: 10 }} whileTap={{ scale: 0.9 }}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeExercise(exerciseIndex)}
+                        className="hover:bg-destructive/10 rounded-xl transition-all duration-300"
+                      >
+                        <Trash2 className="h-5 w-5 text-destructive" />
+                      </Button>
+                    </motion.div>
+                  </div>
+
+                  <div className="space-y-2 sm:space-y-3">
+                    {exercise.sets.map((set, setIndex) => {
+                      // Get previous session's data for this exercise and set
+                      const prevExercise = previousSession?.exercises.find(e => e.name === exercise.name);
+                      const prevSet = prevExercise?.sets[setIndex];
+
+                      return (
+                      <motion.div
+                        key={setIndex}
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{
+                          opacity: set.completed ? 1 : 0.3,
+                          scale: set.completed ? [1, 1.05, 1] : 1
+                        }}
+                        transition={{
+                          opacity: { duration: 0.3 },
+                          scale: {
+                            duration: 0.25,
+                            times: [0, 0.5, 1]
+                          }
+                        }}
+                        className="bg-card/50 p-3 sm:p-3 rounded-xl shadow-md space-y-2 sm:space-y-0"
+                      >
+                        {/* Mobile Layout - Stacked */}
+                        <div className="flex sm:hidden flex-col gap-3">
+                          {/* Set number and Use Prev button row */}
+                          <div className="flex items-center justify-between">
+                            <motion.div
+                              whileTap={{ scale: 0.95 }}
+                              onClick={() => toggleSetComplete(exerciseIndex, setIndex)}
+                              className="cursor-pointer"
+                            >
+                              <Label className="text-primary font-bold text-base cursor-pointer">
+                                Set {setIndex + 1}
+                              </Label>
+                            </motion.div>
+                            <div className="flex items-center gap-2">
+                              {prevSet && (!set.reps || !set.weight) && (
+                                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      if (prevSet.reps) updateSet(exerciseIndex, setIndex, 'reps', String(prevSet.reps));
+                                      if (prevSet.weight) updateSet(exerciseIndex, setIndex, 'weight', String(prevSet.weight));
+                                    }}
+                                    className="h-8 px-3 text-xs font-bold hover:bg-primary/10 rounded-lg text-primary"
+                                    title="Use previous values"
+                                  >
+                                    Use Prev
+                                  </Button>
+                                </motion.div>
+                              )}
+                              {exercise.sets.length > 1 && (
+                                <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => removeSet(exerciseIndex, setIndex)}
+                                    className="h-8 w-8 hover:bg-destructive/10 rounded-lg"
+                                  >
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                </motion.div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Reps input with increment buttons */}
+                          <div className="flex items-center gap-2">
+                            <Label className="text-sm font-semibold text-muted-foreground w-16">Reps</Label>
+                            <Input
+                              type="number"
+                              placeholder={prevSet?.reps ? `${prevSet.reps}` : "0"}
+                              value={set.reps || ''}
+                              onFocus={() => markSetCompleteOnInteraction(exerciseIndex, setIndex)}
+                              onChange={(e) =>
+                                updateSet(exerciseIndex, setIndex, 'reps', e.target.value)
+                              }
+                              className="flex-1 h-12 border-2 font-bold text-center text-lg placeholder:text-muted-foreground/50"
+                            />
+                            <div className="flex gap-1.5">
+                              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                                <Button
+                                  onClick={() => {
+                                    markSetCompleteOnInteraction(exerciseIndex, setIndex);
+                                    incrementReps(exerciseIndex, setIndex, 2);
+                                  }}
+                                  className="h-10 w-10 p-0 text-sm font-bold gradient-primary shadow-md"
+                                  title="Add 2 reps"
+                                >
+                                  +2
+                                </Button>
+                              </motion.div>
+                              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                                <Button
+                                  onClick={() => {
+                                    markSetCompleteOnInteraction(exerciseIndex, setIndex);
+                                    incrementReps(exerciseIndex, setIndex, 5);
+                                  }}
+                                  className="h-10 w-10 p-0 text-sm font-bold gradient-primary shadow-md"
+                                  title="Add 5 reps"
+                                >
+                                  +5
+                                </Button>
+                              </motion.div>
+                            </div>
+                          </div>
+
+                          {/* Weight input with increment buttons */}
+                          <div className="flex items-center gap-2">
+                            <Label className="text-sm font-semibold text-muted-foreground w-16">Weight</Label>
+                            <Input
+                              type="number"
+                              step="0.5"
+                              placeholder={prevSet?.weight ? `${prevSet.weight}` : "0"}
+                              value={set.weight || ''}
+                              onFocus={() => markSetCompleteOnInteraction(exerciseIndex, setIndex)}
+                              onChange={(e) =>
+                                updateSet(exerciseIndex, setIndex, 'weight', e.target.value)
+                              }
+                              className="flex-1 h-12 border-2 font-bold text-center text-lg placeholder:text-muted-foreground/50"
+                            />
+                            <div className="flex gap-1.5">
+                              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                                <Button
+                                  onClick={() => {
+                                    markSetCompleteOnInteraction(exerciseIndex, setIndex);
+                                    const currentWeight = set.weight || 0;
+                                    updateSet(exerciseIndex, setIndex, 'weight', String(currentWeight + 2));
+                                  }}
+                                  className="h-10 w-10 p-0 text-sm font-bold gradient-primary shadow-md"
+                                  title="Add 2kg"
+                                >
+                                  +2
+                                </Button>
+                              </motion.div>
+                              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                                <Button
+                                  onClick={() => {
+                                    markSetCompleteOnInteraction(exerciseIndex, setIndex);
+                                    const currentWeight = set.weight || 0;
+                                    updateSet(exerciseIndex, setIndex, 'weight', String(currentWeight + 5));
+                                  }}
+                                  className="h-10 w-10 p-0 text-sm font-bold gradient-primary shadow-md"
+                                  title="Add 5kg"
+                                >
+                                  +5
+                                </Button>
+                              </motion.div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Desktop Layout - Horizontal */}
+                        <div className="hidden sm:flex gap-2 items-center">
+                          <div className="flex items-center gap-1">
+                            <motion.div
+                              whileTap={{ scale: 0.95 }}
+                              onClick={() => toggleSetComplete(exerciseIndex, setIndex)}
+                              className="cursor-pointer"
+                            >
+                              <Label className="w-12 text-primary font-bold text-sm shrink-0 cursor-pointer">
+                                Set {setIndex + 1}
+                              </Label>
+                            </motion.div>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Input
+                              type="number"
+                              placeholder={prevSet?.reps ? `${prevSet.reps}` : "Reps"}
+                              value={set.reps || ''}
+                              onFocus={() => markSetCompleteOnInteraction(exerciseIndex, setIndex)}
+                              onChange={(e) =>
+                                updateSet(exerciseIndex, setIndex, 'reps', e.target.value)
+                              }
+                              className="w-20 h-10 border-2 font-bold text-center text-base placeholder:text-muted-foreground/50"
+                            />
+                            <div className="flex gap-1">
+                              <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                                <Button
+                                  size="sm"
+                                  onClick={() => {
+                                    markSetCompleteOnInteraction(exerciseIndex, setIndex);
+                                    incrementReps(exerciseIndex, setIndex, 2);
+                                  }}
+                                  className="h-8 w-8 p-0 text-xs font-bold gradient-primary shadow-sm"
+                                  title="Add 2 reps"
+                                >
+                                  +2
+                                </Button>
+                              </motion.div>
+                              <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                                <Button
+                                  size="sm"
+                                  onClick={() => {
+                                    markSetCompleteOnInteraction(exerciseIndex, setIndex);
+                                    incrementReps(exerciseIndex, setIndex, 5);
+                                  }}
+                                  className="h-8 w-8 p-0 text-xs font-bold gradient-primary shadow-sm"
+                                  title="Add 5 reps"
+                                >
+                                  +5
+                                </Button>
+                              </motion.div>
+                            </div>
+                          </div>
+                          <span className="text-muted-foreground text-xs font-medium shrink-0">reps</span>
+                          <div className="flex items-center gap-1">
+                            <Input
+                              type="number"
+                              step="0.5"
+                              placeholder={prevSet?.weight ? `${prevSet.weight}` : "Weight"}
+                              value={set.weight || ''}
+                              onFocus={() => markSetCompleteOnInteraction(exerciseIndex, setIndex)}
+                              onChange={(e) =>
+                                updateSet(exerciseIndex, setIndex, 'weight', e.target.value)
+                              }
+                              className="w-20 h-10 border-2 font-bold text-center text-base placeholder:text-muted-foreground/50"
+                            />
+                            <div className="flex gap-1">
+                              <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                                <Button
+                                  size="sm"
+                                  onClick={() => {
+                                    markSetCompleteOnInteraction(exerciseIndex, setIndex);
+                                    const currentWeight = set.weight || 0;
+                                    updateSet(exerciseIndex, setIndex, 'weight', String(currentWeight + 2));
+                                  }}
+                                  className="h-8 w-8 p-0 text-xs font-bold gradient-primary shadow-sm"
+                                  title="Add 2kg"
+                                >
+                                  +2
+                                </Button>
+                              </motion.div>
+                              <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                                <Button
+                                  size="sm"
+                                  onClick={() => {
+                                    markSetCompleteOnInteraction(exerciseIndex, setIndex);
+                                    const currentWeight = set.weight || 0;
+                                    updateSet(exerciseIndex, setIndex, 'weight', String(currentWeight + 5));
+                                  }}
+                                  className="h-8 w-8 p-0 text-xs font-bold gradient-primary shadow-sm"
+                                  title="Add 5kg"
+                                >
+                                  +5
+                                </Button>
+                              </motion.div>
+                            </div>
+                          </div>
+                          <span className="text-muted-foreground text-xs font-medium shrink-0">kg</span>
+                          {exercise.sets.length > 1 && (
+                            <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => removeSet(exerciseIndex, setIndex)}
+                                className="shrink-0 h-9 w-9 hover:bg-destructive/10 rounded-lg"
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
                               </Button>
                             </motion.div>
                           )}
                         </div>
-                        <div className="flex items-center gap-1">
-                          <Input
-                            type="number"
-                            placeholder={prevSet?.reps ? `${prevSet.reps}` : "Reps"}
-                            value={set.reps || ''}
-                            onChange={(e) =>
-                              updateSet(exerciseIndex, setIndex, 'reps', e.target.value)
-                            }
-                            className="w-20 h-10 border-2 font-semibold text-center text-sm placeholder:text-muted-foreground/50"
-                          />
-                          <div className="flex gap-1">
-                            <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                              <Button
-                                size="sm"
-                                onClick={() => incrementReps(exerciseIndex, setIndex, 2)}
-                                className="h-8 w-8 p-0 text-xs font-bold gradient-primary shadow-sm"
-                                title="Add 2 reps"
-                              >
-                                +2
-                              </Button>
-                            </motion.div>
-                            <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                              <Button
-                                size="sm"
-                                onClick={() => incrementReps(exerciseIndex, setIndex, 5)}
-                                className="h-8 w-8 p-0 text-xs font-bold gradient-primary shadow-sm"
-                                title="Add 5 reps"
-                              >
-                                +5
-                              </Button>
-                            </motion.div>
-                          </div>
-                        </div>
-                        <span className="text-muted-foreground text-xs font-medium shrink-0">reps</span>
-                        <div className="flex items-center gap-1">
-                          <Input
-                            type="number"
-                            step="0.5"
-                            placeholder={prevSet?.weight ? `${prevSet.weight}` : "Weight"}
-                            value={set.weight || ''}
-                            onChange={(e) =>
-                              updateSet(exerciseIndex, setIndex, 'weight', e.target.value)
-                            }
-                            className="w-20 h-10 border-2 font-semibold text-center text-sm placeholder:text-muted-foreground/50"
-                          />
-                          <div className="flex gap-1">
-                            <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                              <Button
-                                size="sm"
-                                onClick={() => {
-                                  const currentWeight = set.weight || 0;
-                                  updateSet(exerciseIndex, setIndex, 'weight', String(currentWeight + 2));
-                                }}
-                                className="h-8 w-8 p-0 text-xs font-bold gradient-primary shadow-sm"
-                                title="Add 2kg"
-                              >
-                                +2
-                              </Button>
-                            </motion.div>
-                            <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                              <Button
-                                size="sm"
-                                onClick={() => {
-                                  const currentWeight = set.weight || 0;
-                                  updateSet(exerciseIndex, setIndex, 'weight', String(currentWeight + 5));
-                                }}
-                                className="h-8 w-8 p-0 text-xs font-bold gradient-primary shadow-sm"
-                                title="Add 5kg"
-                              >
-                                +5
-                              </Button>
-                            </motion.div>
-                          </div>
-                        </div>
-                        <span className="text-muted-foreground text-xs font-medium shrink-0">kg</span>
-                        {exercise.sets.length > 1 && (
-                          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => removeSet(exerciseIndex, setIndex)}
-                              className="shrink-0 h-9 w-9 hover:bg-destructive/10 rounded-lg"
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </motion.div>
-                        )}
-                      </div>
-                    </motion.div>
-                  );
-                  })}
-                </div>
+                      </motion.div>
+                    );
+                    })}
+                  </div>
 
-                <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => addSet(exerciseIndex)}
-                    className="w-full border-2 border-dashed border-primary/30 hover:border-primary/50 hover:bg-primary/5 transition-all duration-300 h-11 font-semibold"
-                  >
-                    <Plus className="h-5 w-5 mr-2" />
-                    Add Set
-                  </Button>
+                  <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => addSet(exerciseIndex)}
+                      className="w-full border-2 border-dashed border-primary/30 hover:border-primary/50 hover:bg-primary/5 transition-all duration-300 h-11 font-semibold"
+                    >
+                      <Plus className="h-5 w-5 mr-2" />
+                      Add Set
+                    </Button>
+                  </motion.div>
                 </motion.div>
-              </motion.div>
-            ))}
-          </AnimatePresence>
+              ))}
+            </AnimatePresence>
+          )}
 
           <motion.div
             whileHover={{ scale: 1.02 }}

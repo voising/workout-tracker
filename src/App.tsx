@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Dumbbell, TrendingUp, Calendar, Settings, Moon, Sun } from 'lucide-react';
+import { Dumbbell, TrendingUp, Calendar, Settings, Moon, Sun, LayoutGrid, Columns2 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { WorkoutLogger } from '@/components/WorkoutLogger';
@@ -19,6 +19,10 @@ function App() {
   const [isDark, setIsDark] = useState(() => {
     const saved = localStorage.getItem('theme');
     return saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  });
+  const [isKanbanLayout, setIsKanbanLayout] = useState(() => {
+    const saved = localStorage.getItem('layout');
+    return saved === 'kanban';
   });
 
   const refreshData = () => {
@@ -41,6 +45,12 @@ function App() {
 
   const toggleTheme = () => {
     setIsDark(!isDark);
+  };
+
+  const toggleLayout = () => {
+    const newLayout = !isKanbanLayout;
+    setIsKanbanLayout(newLayout);
+    localStorage.setItem('layout', newLayout ? 'kanban' : 'columns');
   };
 
   const currentSession = storage.getSessionByDate(selectedDate) || null;
@@ -73,29 +83,52 @@ function App() {
                 <p className="text-sm text-muted-foreground font-medium">Track. Progress. Achieve.</p>
               </div>
             </motion.div>
-            <motion.div
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={toggleTheme}
-                className="rounded-full hover:bg-primary/10 transition-all duration-300"
+            <div className="flex items-center gap-2">
+              {activeTab === 'log' && (
+                <motion.div
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="hidden lg:block"
+                >
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={toggleLayout}
+                    className="rounded-full hover:bg-primary/10 transition-all duration-300"
+                    title={isKanbanLayout ? "Switch to Column Layout" : "Switch to Kanban Layout"}
+                  >
+                    {isKanbanLayout ? (
+                      <Columns2 className="h-5 w-5 text-primary" />
+                    ) : (
+                      <LayoutGrid className="h-5 w-5 text-primary" />
+                    )}
+                  </Button>
+                </motion.div>
+              )}
+              <motion.div
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
               >
-                {isDark ? (
-                  <Sun className="h-5 w-5 text-primary" />
-                ) : (
-                  <Moon className="h-5 w-5 text-primary" />
-                )}
-              </Button>
-            </motion.div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={toggleTheme}
+                  className="rounded-full hover:bg-primary/10 transition-all duration-300"
+                >
+                  {isDark ? (
+                    <Sun className="h-5 w-5 text-primary" />
+                  ) : (
+                    <Moon className="h-5 w-5 text-primary" />
+                  )}
+                </Button>
+              </motion.div>
+            </div>
           </div>
         </div>
       </motion.header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-8 max-w-6xl">
+      <main className={`container mx-auto px-4 py-8 ${!isKanbanLayout || activeTab !== 'log' ? 'max-w-7xl' : ''}`}>
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <motion.div
             initial={{ opacity: 0, y: 10 }}
@@ -138,18 +171,36 @@ function App() {
               />
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <WorkoutLogger
-                selectedDate={selectedDate}
-                existingSession={currentSession}
-                previousSession={previousSession}
-                onSave={refreshData}
-              />
-              <PreviousSessionComparison
-                currentSession={currentSession}
-                previousSession={previousSession}
-              />
-            </div>
+            {!isKanbanLayout ? (
+              /* Column Layout */
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <PreviousSessionComparison
+                  currentSession={currentSession}
+                  previousSession={previousSession}
+                />
+                <WorkoutLogger
+                  selectedDate={selectedDate}
+                  existingSession={currentSession}
+                  previousSession={previousSession}
+                  onSave={refreshData}
+                />
+              </div>
+            ) : (
+              /* Kanban Layout - Full width */
+              <div className="space-y-6">
+                <WorkoutLogger
+                  selectedDate={selectedDate}
+                  existingSession={currentSession}
+                  previousSession={previousSession}
+                  onSave={refreshData}
+                  kanbanMode={true}
+                />
+                <PreviousSessionComparison
+                  currentSession={currentSession}
+                  previousSession={previousSession}
+                />
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="progress">
