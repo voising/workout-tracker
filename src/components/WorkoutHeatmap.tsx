@@ -3,13 +3,15 @@ import { WorkoutSession } from '@/types/workout';
 import { analytics } from '@/services/analytics';
 import { subDays, format, startOfWeek, addDays } from 'date-fns';
 import { motion } from 'framer-motion';
-import { Flame, Trophy, Calendar } from 'lucide-react';
+import { Flame, Trophy, Calendar, HelpCircle } from 'lucide-react';
+import { useState } from 'react';
 
 interface WorkoutHeatmapProps {
   sessions: WorkoutSession[];
 }
 
 export function WorkoutHeatmap({ sessions }: WorkoutHeatmapProps) {
+  const [showLegend, setShowLegend] = useState(false);
   const streak = analytics.calculateStreak(sessions);
 
   // Generate last 12 weeks of dates
@@ -179,88 +181,139 @@ export function WorkoutHeatmap({ sessions }: WorkoutHeatmapProps) {
           <CardDescription className="text-base font-medium">Last 12 weeks</CardDescription>
         </CardHeader>
         <CardContent className="pb-8">
-          <div className="overflow-x-auto">
-            <div className="inline-flex flex-col gap-1">
-              {/* Day labels */}
-              <div className="flex gap-1 mb-1">
-                <div className="w-8" /> {/* Spacer for month labels */}
-                <div className="text-xs text-muted-foreground grid grid-rows-7 gap-1">
-                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, i) => (
-                    <div key={day} className="h-3 flex items-center">
-                      {i % 2 === 1 && day.substring(0, 1)}
+          <div className="space-y-6">
+            {/* Legend popover - appears on hover */}
+            <div className="relative inline-block">
+              <button
+                onMouseEnter={() => setShowLegend(true)}
+                onMouseLeave={() => setShowLegend(false)}
+                className="flex items-center gap-2 text-sm font-semibold text-primary hover:text-primary/80 transition-colors"
+              >
+                <HelpCircle className="w-4 h-4" />
+                What do the colors mean?
+              </button>
+
+              {showLegend && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                  onMouseEnter={() => setShowLegend(true)}
+                  onMouseLeave={() => setShowLegend(false)}
+                  className="absolute top-full left-0 mt-2 bg-card border border-primary/20 rounded-lg p-4 w-80 shadow-lg z-50"
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-3">
+                      <div className="w-6 h-6 rounded bg-primary/80 shadow-sm flex-shrink-0"></div>
+                      <span className="text-sm text-muted-foreground"><span className="font-semibold">Dark red</span> = Intense (20+ sets)</span>
                     </div>
-                  ))}
-                </div>
-              </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-6 h-6 rounded bg-primary/60 shadow-sm flex-shrink-0"></div>
+                      <span className="text-sm text-muted-foreground"><span className="font-semibold">Red</span> = Medium (15-19 sets)</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-6 h-6 rounded bg-primary/40 shadow-sm flex-shrink-0"></div>
+                      <span className="text-sm text-muted-foreground"><span className="font-semibold">Light red</span> = Light (10-14 sets)</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-6 h-6 rounded bg-primary/20 shadow-sm flex-shrink-0"></div>
+                      <span className="text-sm text-muted-foreground"><span className="font-semibold">Very light red</span> = Minimal (1-9 sets)</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-6 h-6 rounded bg-muted/30 shadow-sm flex-shrink-0"></div>
+                      <span className="text-sm text-muted-foreground"><span className="font-semibold">Gray</span> = No workout</span>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </div>
 
-              <div className="flex gap-1">
-                {/* Month labels (vertical) */}
-                <div className="flex flex-col justify-start text-xs text-muted-foreground mr-1">
-                  {weeks.map((week, weekIndex) => {
-                    const firstDay = week[0];
-                    const showMonth = weekIndex === 0 || format(firstDay, 'MMM') !== format(weeks[weekIndex - 1][0], 'MMM');
-                    return (
-                      <div key={weekIndex} className="h-3 mb-1 flex items-start">
-                        {showMonth && format(firstDay, 'MMM')}
+            {/* The actual heatmap - cleaner layout */}
+            <div className="overflow-x-auto pb-4">
+              <div className="inline-block">
+                <div className="flex gap-3">
+                  {/* Day of week labels on the left */}
+                  <div className="flex flex-col gap-0.5 pt-6">
+                    {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((day) => (
+                      <div
+                        key={day}
+                        className="h-8 w-16 text-xs font-semibold text-muted-foreground flex items-center justify-start"
+                      >
+                        {day}
                       </div>
-                    );
-                  })}
-                </div>
+                    ))}
+                  </div>
 
-                {/* Heatmap grid */}
-                <div className="flex gap-1">
-                  {weeks.map((week, weekIndex) => (
-                    <motion.div
-                      key={weekIndex}
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ delay: weekIndex * 0.02 }}
-                      className="flex flex-col gap-1"
-                    >
-                      {week.map((date, dayIndex) => {
-                        const intensity = getIntensity(date);
-                        const dateStr = format(date, 'yyyy-MM-dd');
-                        const session = sessions.find(s => s.date === dateStr);
-                        const future = isFutureDate(date);
-
+                  <div>
+                    {/* Month labels at the top */}
+                    <div className="flex gap-0.5 mb-2">
+                      {weeks.map((week, weekIndex) => {
+                        const firstDay = week[0];
+                        const showMonth = weekIndex === 0 || format(firstDay, 'MMM') !== format(weeks[weekIndex - 1][0], 'MMM');
                         return (
-                          <motion.div
-                            key={dayIndex}
-                            whileHover={{ scale: 1.3 }}
-                            className={`w-4 h-4 rounded-md ${
-                              future ? 'bg-transparent border-2 border-muted/20' : getColor(intensity)
-                            } transition-all hover:ring-2 hover:ring-primary cursor-pointer shadow-sm`}
-                            title={
-                              future
-                                ? format(date, 'MMM d, yyyy')
-                                : hasWorkout(date)
-                                ? `${format(date, 'MMM d, yyyy')} - ${
-                                    session ? analytics.getSessionStats(session).totalSets : 0
-                                  } sets`
-                                : `${format(date, 'MMM d, yyyy')} - No workout`
-                            }
-                          />
+                          <div
+                            key={weekIndex}
+                            className="w-8 text-xs font-bold text-foreground text-center h-5 flex items-center justify-center"
+                          >
+                            {showMonth && format(firstDay, 'MMM')}
+                          </div>
                         );
                       })}
-                    </motion.div>
-                  ))}
-                </div>
-              </div>
+                    </div>
 
-              {/* Legend */}
-              <div className="flex items-center gap-3 mt-6 text-sm font-semibold text-muted-foreground">
-                <span>Less</span>
-                <div className="flex gap-2">
-                  {[0, 1, 2, 3, 4].map((level) => (
-                    <motion.div
-                      key={level}
-                      whileHover={{ scale: 1.2 }}
-                      className={`w-4 h-4 rounded-md ${getColor(level)} shadow-sm`}
-                    />
-                  ))}
+                    {/* Heatmap grid */}
+                    <div className="flex gap-0.5">
+                      {weeks.map((week, weekIndex) => (
+                        <motion.div
+                          key={weekIndex}
+                          initial={{ opacity: 0, scale: 0.8 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={{ delay: weekIndex * 0.02 }}
+                          className="flex flex-col gap-0.5"
+                        >
+                          {week.map((date, dayIndex) => {
+                            const intensity = getIntensity(date);
+                            const dateStr = format(date, 'yyyy-MM-dd');
+                            const session = sessions.find(s => s.date === dateStr);
+                            const future = isFutureDate(date);
+
+                            return (
+                              <motion.div
+                                key={dayIndex}
+                                whileHover={{ scale: 1.5 }}
+                                className={`w-8 h-8 rounded-lg transition-all hover:ring-2 hover:ring-primary hover:shadow-lg cursor-pointer font-bold text-xs flex items-center justify-center ${
+                                  future
+                                    ? 'bg-muted/10 border-2 border-dashed border-muted/30 text-transparent'
+                                    : getColor(intensity) + ' text-muted-foreground hover:text-foreground'
+                                }`}
+                                title={
+                                  future
+                                    ? format(date, 'eee, MMM d, yyyy')
+                                    : hasWorkout(date)
+                                    ? `${format(date, 'eee, MMM d, yyyy')}\n${
+                                        session ? analytics.getSessionStats(session).totalSets : 0
+                                      } sets`
+                                    : `${format(date, 'eee, MMM d, yyyy')}\nNo workout`
+                                }
+                              >
+                                {!future && hasWorkout(date) && session ? analytics.getSessionStats(session).totalSets : ''}
+                              </motion.div>
+                            );
+                          })}
+                        </motion.div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
-                <span>More</span>
               </div>
+            </div>
+
+            {/* Summary text */}
+            <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 text-center">
+              <p className="text-sm text-muted-foreground">
+                <span className="font-semibold text-foreground">{streak.totalWorkouts}</span> workouts completed •
+                <span className="font-semibold text-foreground ml-2">{streak.currentStreak}</span> day streak 🔥
+              </p>
             </div>
           </div>
         </CardContent>
