@@ -138,7 +138,11 @@ export function WorkoutLogger({ selectedDate, existingSession, previousSession, 
     // Deep copy all exercises with all their sets
     const copiedExercises: Exercise[] = previousSession.exercises.map(exercise => ({
       name: exercise.name,
-      sets: exercise.sets.map(set => ({ ...set }))
+      sets: exercise.sets.map(set => ({
+        reps: set.reps,
+        weight: set.weight,
+        completed: false
+      }))
     }));
 
     setExercises(copiedExercises);
@@ -166,7 +170,11 @@ export function WorkoutLogger({ selectedDate, existingSession, previousSession, 
     // Deep copy the exercise with all its sets
     const copiedExercise: Exercise = {
       name: prevExercise.name,
-      sets: prevExercise.sets.map(set => ({ ...set }))
+      sets: prevExercise.sets.map(set => ({
+        reps: set.reps,
+        weight: set.weight,
+        completed: false
+      }))
     };
 
     if (existingIndex >= 0) {
