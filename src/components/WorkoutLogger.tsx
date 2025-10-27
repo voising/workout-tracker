@@ -21,15 +21,10 @@ export function WorkoutLogger({ selectedDate, existingSession, previousSession, 
     existingSession?.exercises || []
   );
   const [currentExerciseName, setCurrentExerciseName] = useState('');
-  const [lastInteractedSet, setLastInteractedSet] = useState<{ exerciseIndex: number; setIndex: number } | null>(null);
   const [pendingShortcutTarget, setPendingShortcutTarget] = useState<{ exerciseIndex: number; setIndex: number } | null>(null);
   const [showCelebration, setShowCelebration] = useState(false);
   const [celebrationSeed, setCelebrationSeed] = useState(0);
   const [isSaveDisabled, setIsSaveDisabled] = useState(false);
-
-  useEffect(() => {
-    setLastInteractedSet(null);
-  }, [selectedDate, existingSession?.id]);
 
   useEffect(() => {
     setIsSaveDisabled(false);
@@ -69,7 +64,6 @@ export function WorkoutLogger({ selectedDate, existingSession, previousSession, 
     });
 
     if (nextTarget) {
-      setLastInteractedSet(nextTarget);
       setPendingShortcutTarget(nextTarget);
     }
   }, []);
@@ -253,12 +247,10 @@ export function WorkoutLogger({ selectedDate, existingSession, previousSession, 
     const updated = [...exercises];
     updated[exerciseIndex].sets[setIndex].completed = !updated[exerciseIndex].sets[setIndex].completed;
     setExercises(updated);
-    setLastInteractedSet({ exerciseIndex, setIndex });
   };
 
   const markSetCompleteOnInteraction = (exerciseIndex: number, setIndex: number) => {
     const updated = [...exercises];
-    setLastInteractedSet({ exerciseIndex, setIndex });
     if (!updated[exerciseIndex].sets[setIndex].completed) {
       updated[exerciseIndex].sets[setIndex].completed = true;
       setExercises(updated);
