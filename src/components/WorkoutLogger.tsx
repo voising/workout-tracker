@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { Plus, Trash2, Save, Copy, Repeat } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,6 +21,116 @@ export function WorkoutLogger({ selectedDate, existingSession, previousSession, 
     existingSession?.exercises || []
   );
   const [currentExerciseName, setCurrentExerciseName] = useState('');
+  const [lastInteractedSet, setLastInteractedSet] = useState<{ exerciseIndex: number; setIndex: number } | null>(null);
+  const [pendingShortcutTarget, setPendingShortcutTarget] = useState<{ exerciseIndex: number; setIndex: number } | null>(null);
+  const [showCelebration, setShowCelebration] = useState(false);
+  const [celebrationSeed, setCelebrationSeed] = useState(0);
+  const [isSaveDisabled, setIsSaveDisabled] = useState(false);
+
+  useEffect(() => {
+    setLastInteractedSet(null);
+  }, [selectedDate, existingSession?.id]);
+
+  useEffect(() => {
+    setIsSaveDisabled(false);
+  }, [exercises]);
+
+  const completeNextIncompleteSet = useCallback(() => {
+    let nextTarget: { exerciseIndex: number; setIndex: number } | null = null;
+
+    setExercises((currentExercises) => {
+      if (currentExercises.length === 0) {
+        return currentExercises;
+      }
+
+      // Find the next incomplete set in order
+      for (let exerciseIndex = 0; exerciseIndex < currentExercises.length; exerciseIndex++) {
+        const setIndex = currentExercises[exerciseIndex].sets.findIndex((set) => !set.completed);
+
+        if (setIndex !== -1) {
+          const updatedExercises = [...currentExercises];
+          const targetExercise = {
+            ...updatedExercises[exerciseIndex],
+            sets: [...updatedExercises[exerciseIndex].sets],
+          };
+
+          targetExercise.sets[setIndex] = {
+            ...targetExercise.sets[setIndex],
+            completed: true,
+          };
+
+          updatedExercises[exerciseIndex] = targetExercise;
+          nextTarget = { exerciseIndex, setIndex };
+          return updatedExercises;
+        }
+      }
+
+      return currentExercises;
+    });
+
+    if (nextTarget) {
+      setLastInteractedSet(nextTarget);
+      setPendingShortcutTarget(nextTarget);
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Enter') {
+        return;
+      }
+
+      const activeElement = document.activeElement as HTMLElement | null;
+      const tagName = activeElement?.tagName.toLowerCase();
+      const allowsShortcut = activeElement?.getAttribute('data-complete-shortcut') === 'true';
+      const isTypingContext =
+        activeElement?.isContentEditable ||
+        tagName === 'textarea' ||
+        tagName === 'select' ||
+        activeElement?.getAttribute('data-skip-complete-shortcut') === 'true' ||
+        ((tagName === 'input' || tagName === 'button' || tagName === 'a') && !allowsShortcut);
+
+      if (isTypingContext) {
+        return;
+      }
+
+      event.preventDefault();
+      completeNextIncompleteSet();
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [completeNextIncompleteSet]);
+
+  useEffect(() => {
+    if (!pendingShortcutTarget) {
+      return;
+    }
+
+    const focusNext = () => {
+      const selector = `input[data-exercise-index="${pendingShortcutTarget.exerciseIndex}"][data-set-index="${pendingShortcutTarget.setIndex}"][data-set-field="reps"]`;
+      const candidates = Array.from(document.querySelectorAll<HTMLInputElement>(selector));
+      const visible = candidates.find((candidate) => {
+        const element = candidate as HTMLElement;
+        return element.offsetParent !== null;
+      });
+
+      if (visible) {
+        visible.focus();
+        visible.select?.();
+      }
+
+      setPendingShortcutTarget(null);
+    };
+
+    const frame = requestAnimationFrame(focusNext);
+    const timeout = window.setTimeout(focusNext, 150);
+
+    return () => {
+      cancelAnimationFrame(frame);
+      window.clearTimeout(timeout);
+    };
+  }, [pendingShortcutTarget]);
 
   const copyEntireWorkout = () => {
     if (!previousSession) return;
@@ -135,10 +245,12 @@ export function WorkoutLogger({ selectedDate, existingSession, previousSession, 
     const updated = [...exercises];
     updated[exerciseIndex].sets[setIndex].completed = !updated[exerciseIndex].sets[setIndex].completed;
     setExercises(updated);
+    setLastInteractedSet({ exerciseIndex, setIndex });
   };
 
   const markSetCompleteOnInteraction = (exerciseIndex: number, setIndex: number) => {
     const updated = [...exercises];
+    setLastInteractedSet({ exerciseIndex, setIndex });
     if (!updated[exerciseIndex].sets[setIndex].completed) {
       updated[exerciseIndex].sets[setIndex].completed = true;
       setExercises(updated);
@@ -146,18 +258,126 @@ export function WorkoutLogger({ selectedDate, existingSession, previousSession, 
   };
 
   const saveWorkout = () => {
+    if (isSaveDisabled) {
+      return;
+    }
+
+    setIsSaveDisabled(true);
+
     const session: WorkoutSession = {
       id: existingSession?.id || `session-${selectedDate}-${Date.now()}`,
       date: selectedDate,
       exercises: exercises.filter(e => e.sets.length > 0),
     };
 
+    const isNewSession = !existingSession;
+
     storage.upsertSession(session);
+    if (isNewSession) {
+      setCelebrationSeed((seed) => seed + 1);
+      setShowCelebration(true);
+    }
     onSave();
   };
 
+  useEffect(() => {
+    if (!showCelebration) {
+      return;
+    }
+    const timeout = window.setTimeout(() => setShowCelebration(false), 1400);
+    return () => window.clearTimeout(timeout);
+  }, [showCelebration]);
+
+  const celebrationBursts = useMemo(() => {
+    const basePositions = [
+      { left: '18%', top: '32%' },
+      { left: '82%', top: '30%' },
+      { left: '50%', top: '65%' }
+    ];
+
+    const colorPalette = ['#BF092F', '#FB7185', '#FBBF24', '#34D399', '#60A5FA'];
+
+    return basePositions.map((position, index) => {
+      const particleCount = 10;
+      const distance = 120 + index * 20 + (celebrationSeed % 3) * 10;
+
+      const particles = Array.from({ length: particleCount }).map((_, particleIndex) => {
+        const angle = ((360 / particleCount) * particleIndex + celebrationSeed * 17) % 360;
+        const radians = (Math.PI / 180) * angle;
+        return {
+          angle,
+          x: Math.cos(radians) * distance,
+          y: Math.sin(radians) * distance,
+          color: colorPalette[(particleIndex + index + celebrationSeed) % colorPalette.length],
+        };
+      });
+
+      return {
+        id: `${celebrationSeed}-${index}`,
+        left: position.left,
+        top: position.top,
+        delay: index * 0.12,
+        particles,
+      };
+    });
+  }, [celebrationSeed]);
+
   return (
     <div className={kanbanMode ? "-mx-4 lg:-mx-8" : "space-y-6"}>
+      <AnimatePresence>
+        {showCelebration && (
+          <motion.div
+            key={celebrationSeed}
+            className="pointer-events-none fixed inset-0 z-[70] overflow-hidden"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3, ease: 'easeOut' }}
+          >
+            {celebrationBursts.map((burst) => (
+              <motion.div
+                key={burst.id}
+                className="absolute"
+                style={{ left: burst.left, top: burst.top }}
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3, delay: burst.delay }}
+              >
+                {burst.particles.map((particle, particleIndex) => (
+                  <motion.span
+                    key={`${burst.id}-${particleIndex}`}
+                    className="absolute h-2 w-2 rounded-full shadow-lg"
+                    style={{ backgroundColor: particle.color }}
+                    initial={{ opacity: 0, scale: 0, x: 0, y: 0 }}
+                    animate={{
+                      opacity: [0, 1, 0],
+                      scale: [0, 1.1, 0.6],
+                      x: particle.x,
+                      y: particle.y,
+                    }}
+                    transition={{
+                      duration: 0.9,
+                      ease: 'easeOut',
+                      delay: burst.delay + particleIndex * 0.04,
+                    }}
+                  />
+                ))}
+              </motion.div>
+            ))}
+            <motion.div
+              className="absolute inset-0"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: [0, 0.35, 0] }}
+              transition={{ duration: 0.6, ease: 'easeOut' }}
+              style={{
+                background: 'radial-gradient(circle at center, rgba(255,255,255,0.35), transparent 60%)'
+              }}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <Card className="shadow-xl hover:shadow-2xl transition-shadow duration-300">
         <CardHeader className="pb-4">
           <CardTitle className="text-2xl gradient-text">Log Workout - {selectedDate}</CardTitle>
@@ -188,6 +408,7 @@ export function WorkoutLogger({ selectedDate, existingSession, previousSession, 
                 value={currentExerciseName}
                 onChange={(e) => setCurrentExerciseName(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && addExercise()}
+                data-skip-complete-shortcut="true"
                 className="h-12 text-base border-2 focus-visible:ring-2 focus-visible:ring-primary transition-all duration-300"
               />
             </div>
@@ -361,6 +582,10 @@ export function WorkoutLogger({ selectedDate, existingSession, previousSession, 
                                   type="number"
                                   placeholder={prevSet?.reps ? `${prevSet.reps}` : "0"}
                                   value={set.reps || ''}
+                                  data-complete-shortcut="true"
+                                  data-exercise-index={exerciseIndex}
+                                  data-set-index={setIndex}
+                                  data-set-field="reps"
                                   onFocus={() => markSetCompleteOnInteraction(exerciseIndex, setIndex)}
                                   onChange={(e) =>
                                     updateSet(exerciseIndex, setIndex, 'reps', e.target.value)
@@ -403,6 +628,10 @@ export function WorkoutLogger({ selectedDate, existingSession, previousSession, 
                                   step="0.5"
                                   placeholder={prevSet?.weight ? `${prevSet.weight}` : "0"}
                                   value={set.weight || ''}
+                                  data-complete-shortcut="true"
+                                  data-exercise-index={exerciseIndex}
+                                  data-set-index={setIndex}
+                                  data-set-field="weight"
                                   onFocus={() => markSetCompleteOnInteraction(exerciseIndex, setIndex)}
                                   onChange={(e) =>
                                     updateSet(exerciseIndex, setIndex, 'weight', e.target.value)
@@ -458,6 +687,10 @@ export function WorkoutLogger({ selectedDate, existingSession, previousSession, 
                                   type="number"
                                   placeholder={prevSet?.reps ? `${prevSet.reps}` : "Reps"}
                                   value={set.reps || ''}
+                                  data-complete-shortcut="true"
+                                  data-exercise-index={exerciseIndex}
+                                  data-set-index={setIndex}
+                                  data-set-field="reps"
                                   onFocus={() => markSetCompleteOnInteraction(exerciseIndex, setIndex)}
                                   onChange={(e) =>
                                     updateSet(exerciseIndex, setIndex, 'reps', e.target.value)
@@ -500,6 +733,10 @@ export function WorkoutLogger({ selectedDate, existingSession, previousSession, 
                                   step="0.5"
                                   placeholder={prevSet?.weight ? `${prevSet.weight}` : "Weight"}
                                   value={set.weight || ''}
+                                  data-complete-shortcut="true"
+                                  data-exercise-index={exerciseIndex}
+                                  data-set-index={setIndex}
+                                  data-set-field="weight"
                                   onFocus={() => markSetCompleteOnInteraction(exerciseIndex, setIndex)}
                                   onChange={(e) =>
                                     updateSet(exerciseIndex, setIndex, 'weight', e.target.value)
@@ -699,6 +936,10 @@ export function WorkoutLogger({ selectedDate, existingSession, previousSession, 
                               type="number"
                               placeholder={prevSet?.reps ? `${prevSet.reps}` : "0"}
                               value={set.reps || ''}
+                              data-complete-shortcut="true"
+                              data-exercise-index={exerciseIndex}
+                              data-set-index={setIndex}
+                              data-set-field="reps"
                               onFocus={() => markSetCompleteOnInteraction(exerciseIndex, setIndex)}
                               onChange={(e) =>
                                 updateSet(exerciseIndex, setIndex, 'reps', e.target.value)
@@ -741,6 +982,10 @@ export function WorkoutLogger({ selectedDate, existingSession, previousSession, 
                               step="0.5"
                               placeholder={prevSet?.weight ? `${prevSet.weight}` : "0"}
                               value={set.weight || ''}
+                              data-complete-shortcut="true"
+                              data-exercise-index={exerciseIndex}
+                              data-set-index={setIndex}
+                              data-set-field="weight"
                               onFocus={() => markSetCompleteOnInteraction(exerciseIndex, setIndex)}
                               onChange={(e) =>
                                 updateSet(exerciseIndex, setIndex, 'weight', e.target.value)
@@ -796,6 +1041,10 @@ export function WorkoutLogger({ selectedDate, existingSession, previousSession, 
                               type="number"
                               placeholder={prevSet?.reps ? `${prevSet.reps}` : "Reps"}
                               value={set.reps || ''}
+                              data-complete-shortcut="true"
+                              data-exercise-index={exerciseIndex}
+                              data-set-index={setIndex}
+                              data-set-field="reps"
                               onFocus={() => markSetCompleteOnInteraction(exerciseIndex, setIndex)}
                               onChange={(e) =>
                                 updateSet(exerciseIndex, setIndex, 'reps', e.target.value)
@@ -838,6 +1087,10 @@ export function WorkoutLogger({ selectedDate, existingSession, previousSession, 
                               step="0.5"
                               placeholder={prevSet?.weight ? `${prevSet.weight}` : "Weight"}
                               value={set.weight || ''}
+                              data-complete-shortcut="true"
+                              data-exercise-index={exerciseIndex}
+                              data-set-index={setIndex}
+                              data-set-field="weight"
                               onFocus={() => markSetCompleteOnInteraction(exerciseIndex, setIndex)}
                               onChange={(e) =>
                                 updateSet(exerciseIndex, setIndex, 'weight', e.target.value)
@@ -915,7 +1168,12 @@ export function WorkoutLogger({ selectedDate, existingSession, previousSession, 
             whileTap={{ scale: 0.98 }}
             className="pt-2"
           >
-            <Button onClick={saveWorkout} className="w-full gradient-primary shadow-lg hover:shadow-xl transition-all duration-300" size="lg">
+            <Button
+              onClick={saveWorkout}
+              disabled={isSaveDisabled}
+              className="w-full gradient-primary shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-60"
+              size="lg"
+            >
               <Save className="h-5 w-5 mr-2" />
               <span className="font-bold">Save Workout</span>
             </Button>
