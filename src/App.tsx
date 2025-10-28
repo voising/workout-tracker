@@ -182,6 +182,7 @@ function App() {
                   selectedDate={selectedDate}
                   existingSession={currentSession}
                   previousSession={previousSession}
+                  allSessions={data.sessions}
                   onSave={refreshData}
                 />
               </div>
@@ -192,6 +193,7 @@ function App() {
                   selectedDate={selectedDate}
                   existingSession={currentSession}
                   previousSession={previousSession}
+                  allSessions={data.sessions}
                   onSave={refreshData}
                   kanbanMode={true}
                 />

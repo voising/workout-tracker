@@ -12,11 +12,12 @@ interface WorkoutLoggerProps {
   selectedDate: string;
   existingSession?: WorkoutSession | null;
   previousSession?: WorkoutSession | null;
+  allSessions?: WorkoutSession[];
   onSave: () => void;
   kanbanMode?: boolean;
 }
 
-export function WorkoutLogger({ selectedDate, existingSession, previousSession, onSave, kanbanMode = false }: WorkoutLoggerProps) {
+export function WorkoutLogger({ selectedDate, existingSession, previousSession, allSessions = [], onSave, kanbanMode = false }: WorkoutLoggerProps) {
   const [exercises, setExercises] = useState<Exercise[]>(
     existingSession?.exercises || []
   );
@@ -25,6 +26,7 @@ export function WorkoutLogger({ selectedDate, existingSession, previousSession, 
   const [showCelebration, setShowCelebration] = useState(false);
   const [celebrationSeed, setCelebrationSeed] = useState(0);
   const [isSaveDisabled, setIsSaveDisabled] = useState(false);
+  const [selectedCopySessionDate, setSelectedCopySessionDate] = useState<string | null>(null);
 
   useEffect(() => {
     setIsSaveDisabled(false);
@@ -126,11 +128,12 @@ export function WorkoutLogger({ selectedDate, existingSession, previousSession, 
     };
   }, [pendingShortcutTarget]);
 
-  const copyEntireWorkout = () => {
-    if (!previousSession) return;
+  const copyEntireWorkout = (sessionToCopy?: WorkoutSession) => {
+    const sessionSource = sessionToCopy || previousSession;
+    if (!sessionSource) return;
 
     // Deep copy all exercises with all their sets
-    const copiedExercises: Exercise[] = previousSession.exercises.map(exercise => ({
+    const copiedExercises: Exercise[] = sessionSource.exercises.map(exercise => ({
       name: exercise.name,
       sets: exercise.sets.map(set => ({
         reps: set.reps,
@@ -140,6 +143,7 @@ export function WorkoutLogger({ selectedDate, existingSession, previousSession, 
     }));
 
     setExercises(copiedExercises);
+    setSelectedCopySessionDate(null); // Close the picker
   };
 
   const addExercise = () => {
@@ -149,7 +153,7 @@ export function WorkoutLogger({ selectedDate, existingSession, previousSession, 
       ...exercises,
       {
         name: currentExerciseName.trim(),
-        sets: [{ reps: 0 }],
+        sets: [{ reps: 0 }, { reps: 0 }, { reps: 0 }],
       },
     ]);
     setCurrentExerciseName('');
@@ -388,16 +392,67 @@ export function WorkoutLogger({ selectedDate, existingSession, previousSession, 
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
+              className="space-y-3"
             >
-              <Button
-                onClick={copyEntireWorkout}
-                className="w-full h-12 sm:h-14 text-sm sm:text-lg font-bold gradient-primary shadow-xl hover:shadow-2xl transition-all duration-300"
-              >
-                <Repeat className="h-5 w-5 sm:h-6 sm:w-6 mr-2 sm:mr-3" />
-                Copy Entire Workout from {previousSession.date}
-              </Button>
+              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                <Button
+                  onClick={() => copyEntireWorkout()}
+                  className="w-full h-12 sm:h-14 text-sm sm:text-lg font-bold gradient-primary shadow-xl hover:shadow-2xl transition-all duration-300"
+                >
+                  <Repeat className="h-5 w-5 sm:h-6 sm:w-6 mr-2 sm:mr-3" />
+                  Copy Entire Workout from {previousSession.date}
+                </Button>
+              </motion.div>
+
+              {/* Session Picker for copying from other sessions */}
+              {allSessions.length > 1 && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="space-y-2"
+                >
+                  {!selectedCopySessionDate ? (
+                    <Button
+                      variant="outline"
+                      onClick={() => setSelectedCopySessionDate('picking')}
+                      className="w-full h-10 text-sm font-semibold border-2 hover:border-primary hover:bg-primary/10 transition-all duration-300"
+                    >
+                      Or pick a different session to copy
+                    </Button>
+                  ) : (
+                    <div className="rounded-xl p-4 bg-gradient-to-br from-primary/5 to-primary/10 shadow-md space-y-2">
+                      <div className="flex items-center justify-between mb-2">
+                        <Label className="text-sm font-bold text-primary">Select Session to Copy</Label>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setSelectedCopySessionDate(null)}
+                          className="h-7 text-xs"
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                      <div className="max-h-48 overflow-y-auto space-y-1.5">
+                        {allSessions
+                          .filter(s => s.date !== selectedDate && s.exercises.length > 0)
+                          .sort((a, b) => b.date.localeCompare(a.date))
+                          .map((session) => (
+                            <Button
+                              key={session.id}
+                              variant="outline"
+                              size="sm"
+                              onClick={() => copyEntireWorkout(session)}
+                              className="w-full justify-start text-sm font-semibold border-2 hover:border-primary hover:bg-primary/10 transition-all duration-300"
+                            >
+                              <Repeat className="h-4 w-4 mr-2" />
+                              {session.date} ({session.exercises.length} exercises)
+                            </Button>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </motion.div>
+              )}
             </motion.div>
           )}
 
